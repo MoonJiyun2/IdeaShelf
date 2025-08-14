@@ -265,4 +265,19 @@ def render_detail(book_id):
                 add_review(book_id, content, nickname=nickname, rating=rating)
                 st.success("감상평이 등록되었습니다.")
                 st.rerun()
+
+# -----------------------------
+# 페이지 분기
+# -----------------------------
+if st.session_state.page == "home":
+    render_home()
+elif st.session_state.page == "browse":
+    render_browse(st.session_state.selected_genre)
+elif st.session_state.page == "search":
+    render_search(search_q)
+elif st.session_state.page == "detail" and st.session_state.current_book_id:
+    render_detail(st.session_state.current_book_id)
+else:
+    render_home()
+
            
