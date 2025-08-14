@@ -180,7 +180,7 @@ def book_row(b):
         if st.button("자세히", key=f"book_{b['id']}"):
             st.session_state.page = "detail"
             st.session_state.current_book_id = int(b["id"])
-            st.experimental_rerun()
+            st.rerun()
 
 # -----------------------------
 # 초기화
@@ -213,7 +213,7 @@ with st.sidebar:
     if genre_sel != "(선택)":
         st.session_state.page = "browse"
         st.session_state.selected_genre = genre_sel
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### ➕ 도서 직접 추가")
@@ -254,11 +254,11 @@ def render_home():
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        card("1) 장르 고르기", "왼쪽 사이드바에서 **장르**를 선택하면 해당 장르의 책 목록이 보여요.")
+        card("1) 장르 고르기", "왼쪽 사이드바에서 [장르]를 선택하면 해당 장르의 책 목록이 보여요.")
     with c2:
-        card("2) 검색하기", "상단 검색창에 **제목/저자**를 입력하면 통합 검색이 가능합니다.")
+        card("2) 검색하기", "상단 검색창에 [제목/저자]를 입력하면 통합 검색이 가능합니다.")
     with c3:
-        card("3) 감상 남기기", "책 상세 페이지에서 **닉네임·평점·감상평**을 작성해 게시해보세요.")
+        card("3) 감상 남기기", "책 상세 페이지에서 [닉네임·평점·감상평]을 작성해 게시해보세요.")
 
     st.subheader("인기 장르 둘러보기")
     # 인기 장르: 테이블로 가볍게 노출
@@ -317,7 +317,7 @@ def render_detail(book_id:int):
             else:
                 add_review(book_id, nickname, rating, content)
                 st.success("감상평이 등록되었습니다!")
-                st.experimental_rerun()
+                st.rerun()
 
     st.markdown("---")
     st.markdown("#### 🗂️ 감상평 모아보기")
@@ -352,7 +352,7 @@ elif page == "detail":
                 st.session_state.page = "browse"
             else:
                 st.session_state.page = "home"
-            st.experimental_rerun()
+            st.rerun()
         render_detail(st.session_state.current_book_id)
     else:
         st.info("먼저 책을 선택해주세요.")
