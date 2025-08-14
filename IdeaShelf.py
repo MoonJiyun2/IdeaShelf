@@ -1,5 +1,4 @@
 import sqlite3
-from contextlib import closing
 from datetime import datetime
 import pandas as pd
 import streamlit as st
@@ -21,9 +20,8 @@ def get_conn():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    with closing(get_conn()) as conn, conn:
+    with get_conn() as conn:
         c = conn.cursor()
-        # 도서 테이블
         c.execute("""
             CREATE TABLE IF NOT EXISTS books (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +31,6 @@ def init_db():
                 cover_path TEXT
             );
         """)
-        # 감상평 테이블 (대댓글용 parent_id 추가)
         c.execute("""
             CREATE TABLE IF NOT EXISTS reviews (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +44,7 @@ def init_db():
                 FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
             );
         """)
+        conn.commit()
 
 def seed_books():
     sample = [
@@ -56,7 +54,7 @@ def seed_books():
         ("코스모스", "칼 세이건", "과학", None),
         ("역사의 역사", "유시민", "역사", None),
     ]
-    with closing(get_conn()) as conn, conn:
+    with get_conn() as conn:
         c = conn.cursor()
         for title, author, genre, cover_path in sample:
             try:
@@ -64,16 +62,17 @@ def seed_books():
                     "INSERT OR IGNORE INTO books(title, author, genre, cover_path) VALUES(?,?,?,?)",
                     (title, author, genre, cover_path)
                 )
-            except sqlite3.IntegrityError:
-                pass
+            except sqlite3.Error as e:
+                print(f"DB 삽입 오류: {e}")
+        conn.commit()
 
 def get_genres():
-    with closing(get_conn()) as conn:
+    with get_conn() as conn:
         df = pd.read_sql_query("SELECT DISTINCT genre FROM books ORDER BY genre", conn)
     return df["genre"].tolist()
 
 def get_books_by_genre(genre):
-    with closing(get_conn()) as conn:
+    with get_conn() as conn:
         return pd.read_sql_query(
             "SELECT * FROM books WHERE genre=? ORDER BY title",
             conn, params=(genre,)
@@ -81,14 +80,14 @@ def get_books_by_genre(genre):
 
 def search_books(q):
     like = f"%{q}%"
-    with closing(get_conn()) as conn:
+    with get_conn() as conn:
         return pd.read_sql_query(
             "SELECT * FROM books WHERE title LIKE ? OR author LIKE ? ORDER BY title",
             conn, params=(like, like)
         )
 
 def get_book(book_id:int):
-    with closing(get_conn()) as conn:
+    with get_conn() as conn:
         df = pd.read_sql_query("SELECT * FROM books WHERE id=?", conn, params=(book_id,))
     return df.iloc[0].to_dict() if not df.empty else None
 
@@ -99,32 +98,37 @@ def add_book(title, author, genre, cover_file):
         cover_path = os.path.join(UPLOAD_DIR, f"{datetime.now().timestamp()}_{cover_file.name}")
         img.save(cover_path)
 
-    with closing(get_conn()) as conn, conn:
+    with get_conn() as conn:
         c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO books(title, author, genre, cover_path) VALUES(?,?,?,?)",
-                  (title.strip(), author.strip() if author else "", genre.strip(), cover_path))
-        row = pd.read_sql_query("SELECT id FROM books WHERE title=?", conn, params=(title.strip(),))
-    return int(row.iloc[0]["id"])
+        c.execute(
+            "INSERT OR IGNORE INTO books(title, author, genre, cover_path) VALUES(?,?,?,?)",
+            (title.strip(), author.strip() if author else "", genre.strip(), cover_path)
+        )
+        conn.commit()
+        df = pd.read_sql_query("SELECT id FROM books WHERE title=?", conn, params=(title.strip(),))
+    return int(df.iloc[0]["id"])
 
 def get_reviews(book_id:int, parent_id=None):
-    with closing(get_conn()) as conn:
+    with get_conn() as conn:
         return pd.read_sql_query(
             "SELECT * FROM reviews WHERE book_id=? AND parent_id IS ? ORDER BY likes DESC, datetime(created_at) DESC",
             conn, params=(book_id, parent_id)
         )
 
 def add_review(book_id:int, content, nickname=None, rating=5, parent_id=None):
-    with closing(get_conn()) as conn, conn:
+    with get_conn() as conn:
         c = conn.cursor()
         c.execute(
             "INSERT INTO reviews(book_id, parent_id, nickname, rating, content, created_at) VALUES(?,?,?,?,?,?)",
             (book_id, parent_id, nickname or "익명", rating, content.strip(), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         )
+        conn.commit()
 
 def like_review(review_id:int):
-    with closing(get_conn()) as conn, conn:
+    with get_conn() as conn:
         c = conn.cursor()
         c.execute("UPDATE reviews SET likes = likes + 1 WHERE id=?", (review_id,))
+        conn.commit()
 
 # -----------------------------
 # 유틸
@@ -235,7 +239,6 @@ def render_reviews(book_id, parent_id=None, level=0):
             if st.button(f"👍 {r['likes']}", key=f"like_{r['id']}"):
                 like_review(r["id"])
                 st.rerun()
-        # 하위 대댓글 재귀 호출
         render_reviews(book_id, parent_id=r["id"], level=level+1)
 
 def render_detail(book_id):
@@ -255,3 +258,11 @@ def render_detail(book_id):
     with st.form(f"review_form_{book_id}", clear_on_submit=True):
         nickname = st.text_input("닉네임", value="")
         rating = st.slider("평점", 1, 5, 5)
+        content = st.text_area("감상평")
+        submitted = st.form_submit_button("등록")
+        if submitted:
+            if content.strip():
+                add_review(book_id, content, nickname=nickname, rating=rating)
+                st.success("감상평이 등록되었습니다.")
+                st.rerun()
+           
