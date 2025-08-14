@@ -180,6 +180,7 @@ def book_row(b):
         if st.button("자세히", key=f"book_{b['id']}"):
             st.session_state.page = "detail"
             st.session_state.current_book_id = int(b["id"])
+            st.experimental_rerun()
 
 # -----------------------------
 # 초기화
@@ -212,6 +213,7 @@ with st.sidebar:
     if genre_sel != "(선택)":
         st.session_state.page = "browse"
         st.session_state.selected_genre = genre_sel
+        st.experimental_rerun()
 
     st.markdown("---")
     st.markdown("### ➕ 도서 직접 추가")
