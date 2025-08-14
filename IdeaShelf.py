@@ -263,4 +263,4 @@ def render_detail(book_id):
         if submitted:
             if content.strip():
                 add_review(book_id, content, nickname=nickname, rating=rating)
-                st.success("감상
+                st.success("감상평이 등록되었습니다.")
